@@ -3,10 +3,27 @@ const express = require('express');
 const fs = require('fs');
 const router = express.Router();
 
+const mime = require('mime-types');
+
 router.get('/file', async (req, res) => {
 
     fs.readdir('./public', (err, files) => {
-        console.log(files);
+        
+        // Not showing .gitkeep file
+        files = files.filter(el => el !== '.gitkeep');
+
+        let finalFiles = [];
+
+        files.forEach(file => {
+            const size = fs.statSync(`./public/${file}`).size;
+            const mimeType = mime.lookup(`./public/${file}`);
+            const type = mimeType.substring(0, mimeType.indexOf('/'));
+            finalFiles.push({
+                name: file,
+                sizeInBytes: size,
+                type
+            });
+        });
 
         if (err) return res.status(500).send({
             message: 'Something was wrong'
@@ -14,7 +31,7 @@ router.get('/file', async (req, res) => {
 
         res.send({
             message: 'Success',
-            files
+            files: finalFiles
         });
     });
 
