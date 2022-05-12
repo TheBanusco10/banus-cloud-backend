@@ -4,62 +4,81 @@ const helper = require('../helpers');
 
 const express = require('express');
 const fs = require('fs');
+const { randomUUID } = require('crypto');
 const router = express.Router();
 
-const mime = require('mime-types');
+const FilesModel = require('../mongo/models/files');
 
-router.get('/file', async (req, res) => {
+router.post('/get-files', async (req, res) => {
 
-    fs.readdir(PUBLIC_DIR, (err, files) => {
+    const user_id = req.body.user_id;
 
-        // Not showing .gitkeep file
-        files = files.filter(el => el !== '.gitkeep');
+    const userFiles = await FilesModel.find({user: user_id});
 
-        let finalFiles = [];
+    console.log(userFiles);
 
-        files.forEach(file => {
-            finalFiles.push(helper.getFileInformation(`${PUBLIC_DIR}/${file}`, file));
-        });
+    let finalFiles = [];
 
-        if (err) return res.status(500).send({
-            message: 'Something was wrong'
+    try {
+
+        userFiles.forEach(file => {
+            finalFiles.push(helper.getFileInformation(`${PUBLIC_DIR}/${file.name}`, file.name));
         });
 
         res.send({
             message: 'Success',
             files: finalFiles
         });
-    });
+
+    }catch(err) {
+        if (err) return res.status(500).send({
+            message: 'Something was wrong'
+        });
+    }
 
 });
 
 router.post('/file', async (req, res) => {
     const files = req.files.files;
 
+    const user_id = req.body.user_id;
+
+    console.log(user_id);
+
     try {
 
-        // let fileInformation = [];
-
         if (files.length) {
-            files.forEach(el => {
+            files.forEach(async el => {
+
+                const uuid = randomUUID();
+                const filename = `${uuid}-${el.name}`;
+
                 // TODO Return file/files uploaded to avoid a new request to the server when a file is uploaded
-                el.mv(`${PUBLIC_DIR}/${el.name}`);
-                // const FILENAME = el.name
-                // el.mv(`${PUBLIC_DIR}/${el.name}`, function (err) {
-                    
-                //     fileInformation.push(helper.getFileInformation(`${PUBLIC_DIR}/${FILENAME}`, FILENAME));
-                //     console.log(helper.getFileInformation(`${PUBLIC_DIR}/${FILENAME}`, FILENAME));
-                // });
+                el.mv(`${PUBLIC_DIR}/${filename}`);
+                await FilesModel.create({
+                    user: user_id,
+                    name: filename
+                });
+                
             });
 
         }else {
-            files.mv(`${PUBLIC_DIR}/${files.name}`);
-            // fileInformation.push(helper.getFileInformation(`${PUBLIC_DIR}/${files.name}`, files.name));
+
+            const uuid = randomUUID();
+
+            const filename = `${uuid}-${files.name}`;
+
+            files.mv(`${PUBLIC_DIR}/${filename}`);
+            
+            await FilesModel.create({
+                user: user_id,
+                name: filename
+            });
         }
+        
 
         res.status(200).send({
-            message: 'Files copied successfully',
-            // files: fileInformation
+            message: 'Files copied successfully'
         });
 
     }catch (err) {
